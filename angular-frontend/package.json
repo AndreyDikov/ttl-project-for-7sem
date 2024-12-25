@@ -1,0 +1,46 @@
+{
+  "name": "angular-todo",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/animations": "^14.3.0",
+    "@angular/material": "^14.2.7",
+    "@angular/common": "^14.3.0",
+    "@angular/core": "^14.3.0",
+    "@angular/forms": "^14.3.0",
+    "@angular/platform-browser": "^14.3.0",
+    "@angular/platform-browser-dynamic": "^14.3.0",
+    "@angular/router": "^14.3.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "bootstrap-css-only": "^4.4.1",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6",
+    "ngx-color-picker": "^13.0.0",
+    "ngx-cookie-service": "^14.0.0",
+    "ngx-device-detector": "^4.0.1",
+    "ngx-translate-core": "^11.0.3",
+    "ngx-translate-multi-http-loader": "^8.0.2"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^14.2.13",
+    "@types/jasmine": "~4.3.0",
+    "jasmine-core": "~4.6.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "~2.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+
+  }
+}

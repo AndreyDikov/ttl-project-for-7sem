@@ -1,0 +1,160 @@
+version: "3.9"
+
+services:
+  keycloak-database:
+    container_name: keycloak-database
+    image: postgres:16
+    restart: always
+#    ports:
+#      - '3333:5432'
+    volumes:
+      - ./mount/keycloak/db/data:/var/lib/postgresql/data/kk/
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/kk/
+    network_mode: host
+    command: -p 5433 # нужно, чтобы были разные порты у всех БД (т.к. теперь используется сеть host, а не внутренняя виртуальная как ранее)
+
+  keycloak-server:
+    container_name: keycloak-server
+    image: quay.io/keycloak/keycloak:18.0.2
+    command:
+      - -v start # -v означает verbose - подробные логи (только для тестирования, в продакшне нужно отключать)
+      - --import-realm
+      - --auto-build # обязательно для правильной авто сборки KK и чтобы не было ошибки jdbc driver not found
+#      - --log-level=DEBUG #для тестирования (в продакшне нужно отключать)
+    environment:
+      # https://www.keycloak.org/server/all-config
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+#     KC_HOSTNAME: localhost # ip адрес/домен хостинга (виртуальной машины) или localhost - если запускаете на своем комп-ре
+      KC_HOSTNAME: 2381209-gp84849.twc1.net # ip адрес/домен хостинга (виртуальной машины) или localhost - если запускаете на своем комп-ре
+      KC_HOSTNAME_ADMIN_URL: https://2381209-gp84849.twc1.net:8443 # для более корректной работы на хостинге
+      KC_HOSTNAME_PORT: 8443
+      KC_HEALTH_ENABLED: true
+      KC_METRICS_ENABLED: true
+      KC_DB: postgres # имя вендора БД (значение должно быть именно таким)
+      KC_DB_URL_DATABASE: postgres # название БД (может быть и другим)
+      KC_DB_URL_HOST: 2381209-gp84849.twc1.net
+      KC_DB_URL_PORT: 5433
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+      KC_DB_SCHEMA: public
+#      KC_HTTPS_CERTIFICATE_FILE: /var/lib/keycloak/ssl/docker.cer
+#      KC_HTTPS_CERTIFICATE_KEY_FILE: /var/lib/keycloak/ssl/docker.pkcs8
+      KC_HTTPS_CERTIFICATE_FILE: /var/lib/keycloak/ssl/timeweb.cer
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /var/lib/keycloak/ssl/timeweb.pkcs8
+    restart: always
+#    ports:
+      #      - "8080:8080"
+#      - "8443:8443"
+    depends_on:
+      - keycloak-database
+    volumes:
+      - ./mount/ssl:/var/lib/keycloak/ssl
+      - ./mount/keycloak/todorealm-timeweb:/opt/keycloak/data/import
+#      - ./mount/keycloak/themes/keywind:/opt/keycloak/themes/keywind
+      - ./mount/keycloak/themes/keywind/:/opt/keycloak/providers # при копировании на хостинг готового jar файла с темой (а не папки с файлами) - меньше будет "глюков"
+    network_mode: host
+
+
+  planner-config:
+    container_name: planner-config
+    #    build: ../planner-config # можно сделать так, чтобы при запуске compose автоматически собирался по исходникам в папке и образ (но в разных ситуациях это может быть неудобно, может уходить много времени)
+    image: javabegin1/planner-config
+    restart: on-failure
+    depends_on:
+      keycloak-server:
+        condition: service_started
+    environment:
+      - SPRING_PROFILES_ACTIVE=default,timeweb
+#    ports:
+#      - "8888:8888"
+    network_mode: host
+
+
+  planner-server:
+    container_name: planner-server
+    image: javabegin1/planner-server
+    restart: on-failure
+#    ports:
+#      - '8761:8761'
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+      - SPRING_CONFIG_IMPORT=configserver:http://2381209-gp84849.twc1.net:8888 # обязательно нужно указывать именно тут, а не в файле properties (иначе не подтянется config server)
+    depends_on:
+      planner-config:
+        condition: service_started
+    network_mode: host
+
+
+  planner-database:
+    container_name: planner-database
+    image: postgres:16
+    restart: always
+#    ports:
+#      - '4444:5432'
+    volumes:
+      - ./mount/planner-todo/db/data:/var/lib/postgresql/data/todo/
+      - ./mount/planner-todo/db/ddl:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/todo/
+    network_mode: host
+    command: -p 5434 # нужно, чтобы были разные порты у всех БД (т.к. теперь используется сеть host, а не внутренняя виртуальная как ранее)
+
+  planner-todo:
+    container_name: planner-todo
+    image: javabegin1/planner-todo
+    restart: always
+    environment:
+      - SPRING_PROFILES_ACTIVE=default,micro,todo,logging,kc
+      - SPRING_CONFIG_IMPORT=configserver:http://2381209-gp84849.twc1.net:8888
+    depends_on:
+      planner-server:
+        condition: service_started
+    network_mode: host
+
+
+  planner-gateway:
+    container_name: planner-gateway
+    image: javabegin1/planner-gateway
+    restart: always
+    environment:
+      - SPRING_PROFILES_ACTIVE=default,ssl
+      - SPRING_CONFIG_IMPORT=configserver:http://2381209-gp84849.twc1.net:8888
+    depends_on:
+      planner-todo:
+        condition: service_started
+#    ports:
+#      - "8765:8765"
+    network_mode: host
+
+  planner-bff:
+    container_name: planner-bff
+    image: javabegin1/planner-bff
+    restart: on-failure
+    environment:
+      - SPRING_PROFILES_ACTIVE=default,timeweb
+      - KEYCLOAK_URL=https://2381209-gp84849.twc1.net:8443/realms/todoapp-realm/protocol/openid-connect # все служебные URL можно получить в админке Keycloak
+      - RESOURCESERVER_URL=https://2381209-gp84849.twc1.net:8765/planner-todo # напоминание: запрос не напрямую, а через gateway
+      - KEYCLOAK_SECRET=hZGplna0msyZe7yBFxFuAgrkkXgkw9eM # чтобы не нужно было перезагружать приложение, если значение secret изменится
+#    ports:
+#      - "8902:8902"
+    network_mode: host
+
+  angular-todo:
+    container_name: angular-todo
+    image: javabegin1/angular-todo
+    restart: on-failure
+#    environment:
+#      - --environment=prod
+#    ports:
+#      - "80:80"
+#      - "4200:443"
+    network_mode: host
+

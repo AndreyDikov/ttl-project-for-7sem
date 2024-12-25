@@ -1,0 +1,15 @@
+
+# Нужно не забыть выставить архитектуру процессора хостинга (где будет размещен контейнер)
+FROM --platform=linux/amd64 node:20 as build
+
+WORKDIR /app/angular-todo
+
+# настройки и названия всех зависимостей, которые пригодятся в проектах (по аналогии как dependencies в файле build.gradle)
+COPY ./package.json ./
+
+# скачивание всех библиотек, которые используются в проекте
+RUN npm install --loglevel verbose
+
+# можно устанавливать любую версию, главное, чтобы она была выше, чем в приложении
+# angular cli понадобится в дочерних образах для выполнения команд ng
+RUN npm install -g @angular/cli --loglevel verbose
